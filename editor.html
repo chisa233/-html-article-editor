@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章与自定义标签整合编辑器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: #ffffff;
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #475569;
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+        input[type="text"], textarea {
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+            width: 100%;
+            font-family: monospace; /* 编辑器使用等宽字体 */
+            font-size: 0.95rem; /* 稍微小一点，更像代码 */
+        }
+        .content-editor {
+            min-height: 600px;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background-color: #ffffff;
+            outline: none;
+            overflow-y: auto;
+            line-height: 1.6;
+            font-size: 1rem;
+            resize: vertical; /* 允许用户垂直调整大小 */
+        }
+        .content-editor:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+        }
+
+        /* 预览框样式 */
+        .preview-iframe-container {
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            background-color: #ffffff;
+            overflow: hidden;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+        .preview-iframe {
+            flex-grow: 1;
+            width: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <header class="bg-[#007bff] text-white py-6 text-center shadow-md">
+        <h1 class="text-3xl font-bold">文章与自定义标签整合编辑器</h1>
+        <p class="mt-2 text-lg">在此编写您的文章，并方便地插入特殊样式标签</p>
+    </header>
+
+    <main class="container mx-auto p-6 md:p-8 flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 文章编写区 -->
+        <section class="card lg:col-span-2 flex flex-col">
+            <h2 class="text-xl font-bold text-[#007bff] mb-4">文章内容 (HTML 编辑)</h2>
+            <div class="mb-4">
+                <label for="article-title" class="block text-sm font-medium text-gray-700 mb-1">文章标题</label>
+                <input type="text" id="article-title" placeholder="请输入文章标题">
+            </div>
+            <!-- 导出完整 HTML 按钮及相关输出区 - 新位置 -->
+            <div class="mb-6">
+                <button id="export-html" class="btn-primary w-full">复制文章内容 (含标题)</button>
+                <div id="export-copy-message" class="text-green-600 text-sm mt-2 text-center hidden">已复制！</div>
+            </div>
+            
+            <div class="flex-grow">
+                <label for="article-content" class="block text-sm font-medium text-gray-700 mb-1">正文 (HTML)</label>
+                <textarea id="article-content" class="content-editor" placeholder="在此输入或插入HTML内容..."></textarea>
+            </div>
+        </section>
+
+        <!-- 渲染预览区 -->
+        <section class="card lg:col-span-1 flex flex-col">
+            <h2 class="text-xl font-bold text-[#007bff] mb-4">渲染预览</h2>
+            <div class="preview-iframe-container flex-grow">
+                <iframe id="article-preview-iframe" class="preview-iframe"></iframe>
+            </div>
+        </section>
+
+        <!-- 标签编辑器侧边栏 -->
+        <aside class="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- 基础标签 -->
+            <section class="card">
+                <h2 class="text-xl font-bold text-[#007bff] mb-4">基础标签</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="insert-p" class="btn-secondary" data-shortcut="Alt+P">插入 &lt;p&gt; (Alt+P)</button>
+                    <button id="insert-h1" class="btn-secondary" data-shortcut="Alt+1">插入 &lt;h1&gt; (Alt+1)</button>
+                    <button id="insert-h2" class="btn-secondary" data-shortcut="Alt+2">插入 &lt;h2&gt; (Alt+2)</button>
+                    <button id="insert-img-placeholder" class="btn-secondary" data-shortcut="Alt+I">插入图片占位符 (Alt+I)</button>
+                    <!-- 可以根据需要添加更多基础标签 -->
+                </div>
+            </section>
+
+            <!-- 文本样式标签 -->
+            <section class="card">
+                <h2 class="text-xl font-bold text-[#007bff] mb-4">文本样式标签</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="h5-text" class="block text-sm font-medium text-gray-700 mb-1">提醒文本 (h5)</label>
+                        <input type="text" id="h5-text" placeholder="请输入提醒内容" class="mb-2">
+                        <button id="insert-h5" class="btn-primary w-full" data-shortcut="Alt+5">插入 h5 标签 (Alt+5)</button>
+                    </div>
+                    <div>
+                        <label for="mark-text" class="block text-sm font-medium text-gray-700 mb-1">高亮样式 (mark)</label>
+                        <input type="text" id="mark-text" placeholder="请输入高亮内容" class="mb-2">
+                        <button id="insert-mark" class="btn-primary w-full" data-shortcut="Alt+M">插入 mark 标签 (Alt+M)</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 区块样式标签 -->
+            <section class="card">
+                <h2 class="text-xl font-bold text-[#007bff] mb-4">区块样式标签</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">分隔线 (hr)</label>
+                        <button id="insert-hr" class="btn-primary w-full" data-shortcut="Alt+H">插入 hr 标签 (Alt+H)</button>
+                    </div>
+                    <div>
+                        <label for="blockquote-text" class="block text-sm font-medium text-gray-700 mb-1">引用/提示框 (blockquote)</label>
+                        <textarea id="blockquote-text" rows="3" placeholder="请输入引用或提示内容" class="mb-2"></textarea>
+                        <button id="insert-blockquote" class="btn-primary w-full" data-shortcut="Alt+B">插入 blockquote 标签 (Alt+B)</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 特殊模块 -->
+            <section class="card">
+                <h2 class="text-xl font-bold text-[#007bff] mb-4">特殊模块</h2>
+                <div class="space-y-6">
+                    <!-- 评分模块 -->
+                    <div class="card p-4">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-3">评分模块 (h4)</h3>
+                        <div class="flex items-center space-x-2 mb-3">
+                            <label for="score-value" class="block text-sm font-medium text-gray-700">评分值:</label>
+                            <input type="text" id="score-value" value="5" class="w-20 text-center">
+                            <label for="score-max" class="text-sm font-medium text-gray-700">总分:</label>
+                            <input type="text" id="score-max" value="5" class="w-20 text-center">
+                        </div>
+                        <button id="insert-score" class="btn-primary w-full" data-shortcut="Alt+S">插入 h4 评分标签 (Alt+S)</button>
+                        <p id="score-preview" class="text-center text-gray-600 mt-2 text-sm">预览: 评分: ★★★★★</p>
+                    </div>
+
+                    <!-- 操作步骤模块 -->
+                    <div class="card p-4">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-3">操作步骤模块 (dl, dt, b, dd)</h3>
+                        <div class="space-y-2 mb-4">
+                            <label for="step-title" class="block text-sm font-medium text-gray-700 mb-1">步骤标题:</label>
+                            <input type="text" id="step-title" placeholder="例如：打开应用商店">
+                            <label for="step-desc" class="block text-sm font-medium text-gray-700 mb-1">步骤描述:</label>
+                            <textarea id="step-desc" rows="2" placeholder="例如：在您的手机上找到并点击图标。"></textarea>
+                            <button id="add-step" class="btn-secondary w-full">添加步骤</button>
+                        </div>
+                        <div id="steps-list" class="bg-gray-50 p-3 rounded-md border border-gray-200 min-h-[80px] max-h-[200px] overflow-y-auto mb-4">
+                            <p class="text-sm text-gray-500 text-center" id="no-steps-message">暂无步骤</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="insert-steps" class="btn-primary flex-1" data-shortcut="Alt+D">插入步骤 HTML (Alt+D)</button>
+                            <button id="clear-steps" class="btn-secondary flex-1">清空步骤</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </main>
+
+    <footer class="bg-gray-100 text-gray-600 py-4 text-center text-sm shadow-inner mt-8">
+        <p>&copy; 2025 文章与自定义标签整合编辑器. All Rights Reserved.</p>
+    </footer>
+
+    <script>
+        const articleTitleInput = document.getElementById('article-title');
+        const articleContentEditor = document.getElementById('article-content'); // 现在是 textarea
+        const exportHtmlButton = document.getElementById('export-html');
+        const exportCopyMessage = document.getElementById('export-copy-message');
+        const articlePreviewIframe = document.getElementById('article-preview-iframe');
+
+        // insertHtmlAtCaret 现在操作 textarea 的 value 和 selectionStart/End
+        const insertHtmlAtCaret = (html) => {
+            const textarea = articleContentEditor;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const value = textarea.value;
+
+            textarea.value = value.substring(0, start) + html + value.substring(end);
+
+            // 恢复光标位置到插入内容之后
+            textarea.selectionStart = textarea.selectionEnd = start + html.length;
+            textarea.focus();
+            updatePreview(); // 插入后更新预览
+        };
+
+        // 基础标签模板，现在返回纯 HTML 字符串
+        const tags = {
+            p: { template: () => `<p>请输入段落内容</p>` },
+            h1: { template: () => `<h1>请输入一级标题</h1>` },
+            h2: { template: () => `<h2>请输入二级标题</h2>` },
+            imgPlaceholder: { template: () => `<p><img src="https://w.wallhaven.cc/full/6l/wallhaven-6lkyeq.png" alt="图片占位符" style="width:100%; max-width: 400px; height: auto; display: block; margin: 1em auto; border: 1px dashed #90cdf4; padding: 5px; box-sizing: border-box;"></p>` }, // 图片占位符
+            h5: { template: (text) => `<h5>${text || '请输入提醒内容'}</h5>` },
+            mark: { template: (text) => `<mark>${text || '请输入高亮内容'}</mark>` },
+            hr: { template: () => `<hr>` },
+            blockquote: { template: (text) => `<blockquote>${text || '请输入引用或提示内容'}</blockquote>` }
+        };
+
+        const getStars = (value, max) => {
+            const numStars = Math.floor(value);
+            const hasHalf = value - numStars >= 0.5;
+            const emptyStars = max - numStars - (hasHalf ? 1 : 0);
+            let stars = '★'.repeat(numStars);
+            if (hasHalf) stars += '☆';
+            stars += '☆'.repeat(emptyStars);
+            return stars;
+        };
+
+        // 基础标签按钮
+        const insertPButton = document.getElementById('insert-p');
+        const insertH1Button = document.getElementById('insert-h1');
+        const insertH2Button = document.getElementById('insert-h2');
+        const insertImgPlaceholderButton = document.getElementById('insert-img-placeholder'); // 新增图片占位符按钮
+
+        const h5TextInput = document.getElementById('h5-text');
+        const insertH5Button = document.getElementById('insert-h5');
+        const markTextInput = document.getElementById('mark-text');
+        const insertMarkButton = document.getElementById('insert-mark');
+        const insertHrButton = document.getElementById('insert-hr');
+        const blockquoteTextInput = document.getElementById('blockquote-text');
+        const insertBlockquoteButton = document.getElementById('insert-blockquote');
+
+        const scoreValueInput = document.getElementById('score-value');
+        const scoreMaxInput = document.getElementById('score-max');
+        const insertScoreButton = document.getElementById('insert-score');
+        const scorePreview = document.getElementById('score-preview');
+
+        const stepTitleInput = document.getElementById('step-title');
+        const stepDescInput = document.getElementById('step-desc');
+        const addStepButton = document.getElementById('add-step');
+        const stepsList = document.getElementById('steps-list');
+        const insertStepsButton = document.getElementById('insert-steps');
+        const clearStepsButton = document.getElementById('clear-steps');
+        const noStepsMessage = document.getElementById('no-steps-message');
+
+        let currentSteps = [];
+
+        const updateScorePreview = () => {
+            const value = parseFloat(scoreValueInput.value);
+            const max = parseFloat(scoreMaxInput.value);
+            if (!isNaN(value) && !isNaN(max) && max > 0) {
+                scorePreview.textContent = `预览: 评分: ${getStars(value, max)}`;
+            } else {
+                scorePreview.textContent = `预览: 评分: 请输入有效数字`;
+            }
+        };
+
+        const renderStepsList = () => {
+            stepsList.innerHTML = '';
+            if (currentSteps.length === 0) {
+                noStepsMessage.classList.remove('hidden');
+                stepsList.appendChild(noStepsMessage);
+                return;
+            }
+            noStepsMessage.classList.add('hidden');
+            currentSteps.forEach((step, index) => {
+                const stepItem = document.createElement('div');
+                stepItem.className = 'flex items-center justify-between p-2 border-b border-gray-200 last:border-b-0 text-sm';
+                stepItem.innerHTML = `
+                    <span class="font-medium text-gray-700">${index + 1}. ${step.title}</span>
+                    <button data-index="${index}" class="remove-step-btn text-red-500 hover:text-red-700 ml-2">移除</button>
+                `;
+                stepsList.appendChild(stepItem);
+            });
+            document.querySelectorAll('.remove-step-btn').forEach(button => {
+                button.onclick = (e) => {
+                    const indexToRemove = parseInt(e.target.dataset.index);
+                    currentSteps.splice(indexToRemove, 1);
+                    renderStepsList();
+                };
+            });
+        };
+
+        // 基础标签插入事件
+        insertPButton.onclick = () => {
+            insertHtmlAtCaret(tags.p.template());
+        };
+        insertH1Button.onclick = () => {
+            insertHtmlAtCaret(tags.h1.template());
+        };
+        insertH2Button.onclick = () => {
+            insertHtmlAtCaret(tags.h2.template());
+        };
+        // 新增图片占位符插入事件
+        insertImgPlaceholderButton.onclick = () => {
+            insertHtmlAtCaret(tags.imgPlaceholder.template());
+        };
+
+        insertH5Button.onclick = () => {
+            insertHtmlAtCaret(tags.h5.template(h5TextInput.value));
+            h5TextInput.value = '';
+        };
+
+        insertMarkButton.onclick = () => {
+            insertHtmlAtCaret(tags.mark.template(markTextInput.value));
+            markTextInput.value = '';
+        };
+
+        insertHrButton.onclick = () => {
+            insertHtmlAtCaret(tags.hr.template());
+        };
+
+        insertBlockquoteButton.onclick = () => {
+            insertHtmlAtCaret(tags.blockquote.template(blockquoteTextInput.value));
+            blockquoteTextInput.value = '';
+        };
+
+        scoreValueInput.oninput = updateScorePreview;
+        scoreMaxInput.oninput = updateScorePreview;
+        updateScorePreview();
+
+        insertScoreButton.onclick = () => {
+            const value = parseFloat(scoreValueInput.value);
+            const max = parseFloat(scoreMaxInput.value);
+            if (!isNaN(value) && !isNaN(max) && max > 0) {
+                insertHtmlAtCaret(`<h4>评分: ${getStars(value, max)}</h4>`);
+            } else {
+                alert('请输入有效的评分数字！');
+            }
+        };
+
+        addStepButton.onclick = () => {
+            const title = stepTitleInput.value.trim();
+            const desc = stepDescInput.value.trim();
+            if (title && desc) {
+                currentSteps.push({ title, desc });
+                stepTitleInput.value = '';
+                stepDescInput.value = '';
+                renderStepsList();
+            } else {
+                alert('步骤标题和描述不能为空！');
+            }
+        };
+
+        insertStepsButton.onclick = () => {
+            if (currentSteps.length === 0) {
+                alert('请先添加步骤！');
+                return;
+            }
+            let stepsHtml = '<dl>\n';
+            currentSteps.forEach((step, index) => {
+                stepsHtml += `  <dt><b>${index + 1}</b>${step.title}</dt>\n`;
+                stepsHtml += `  <dd>${step.desc}</dd>\n`;
+            });
+            stepsHtml += '</dl>';
+            insertHtmlAtCaret(stepsHtml);
+            currentSteps = []; // 插入后清空步骤列表
+            renderStepsList();
+        };
+
+        clearStepsButton.onclick = () => {
+            currentSteps = [];
+            renderStepsList();
+        };
+
+        // --- 导出 HTML 逻辑 (直接复制 textarea 内容) ---
+        exportHtmlButton.onclick = () => {
+            const titleHtml = articleTitleInput.value ? `<h1>${articleTitleInput.value}</h1>\n` : '';
+            const contentHtml = articleContentEditor.value; // 直接获取 textarea 的内容
+            
+            const fullHtml = titleHtml + contentHtml;
+            
+            // 使用一个临时的 textarea 来执行复制操作
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = fullHtml;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            exportCopyMessage.classList.remove('hidden');
+            setTimeout(() => {
+                exportCopyMessage.classList.add('hidden');
+            }, 2000);
+        };
+
+        // --- 实时渲染预览逻辑 ---
+        // 样式定义，与你的 mpHtmlTagStyle 概念对应
+        const previewStyles = {
+            'p': 'margin-bottom: 1em; line-height: 1.6; color: #334155;',
+            'h1': 'font-size: 2em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: #333;',
+            'h2': 'font-size: 1.5em; font-weight: bold; margin-top: 0.8em; margin-bottom: 0.4em; color: #333;',
+            'h5': 'background-color: #FFF3E0; color: #FF5722; padding: 0.5em 0.8em; border-radius: 0.375rem; font-weight: bold; display: block; margin: 1em 0;',
+            'mark': 'background-color: #fce883; padding: 0.1em 0.2em; border-radius: 0.1875rem; color: #333;',
+            'hr': 'border: none; border-top: 1px dashed #ccc; margin: 2em 0;',
+            'blockquote': 'background-color: #e6f7ff; border: 1px solid #91d5ff; border-left: 5px solid #1890ff; padding: 1em; margin: 1.5em 0; border-radius: 0.5rem; font-style: italic; color: #333; line-height: 1.6;',
+            'h4': 'background-color: #f5f5f5; color: #66B2FF; padding: 0.8em 1em; margin: 1.5em 0; border-radius: 0.5rem; font-size: 1em; text-align: center; font-weight: bold; display: block; letter-spacing: 0.3em;',
+            'dl': 'background-color: #f8f8f8; border-radius: 0.5rem; padding: 1em; margin: 0.75em 0;',
+            'dt': 'font-weight: bold; font-size: 1.1em; color: #66B2FF; margin-top: 0.75em; margin-bottom: 0.25em; display: flex; align-items: center;',
+            'b': 'background-color: #66B2FF; border-radius: 50%; width: 0.8em; height: 0.8em; line-height: 0.8em; text-align: center; margin-right: 0.75em; display: inline-block; flex-shrink: 0;',
+            'dd': 'font-size: 0.9em; color: #343a40; line-height: 1.6; margin-left: 1.25em; padding-bottom: 0.5em;',
+            'dd:not(:last-of-type)': 'border-bottom: 1px dashed #eee; padding-bottom: 1em; margin-bottom: 1em;',
+            'img': 'max-width: 100%; height: auto; display: block; margin: 1em auto; border: 1px dashed #ccc; padding: 5px; box-sizing: border-box;' // 预览中图片的基本样式
+        };
+
+        const generatePreviewStyleString = (stylesObject) => {
+            let styleStr = '';
+            for (const selector in stylesObject) {
+                styleStr += `${selector} { ${stylesObject[selector]} }\n`;
+            }
+            return styleStr;
+        };
+
+        const updatePreview = () => {
+            const previewDoc = articlePreviewIframe.contentDocument || articlePreviewIframe.contentWindow.document;
+            previewDoc.open();
+            
+            // 将 rpx 转换为 em，假设 1em = 32rpx (小程序默认字号)
+            const convertedStyles = {};
+            for (const tag in previewStyles) {
+                convertedStyles[tag] = previewStyles[tag].replace(/(\d+(\.\d+)?)rpx/g, (match, p1) => {
+                    return `${parseFloat(p1) / 32}em`;
+                });
+            }
+
+            const styleHtml = `<style>
+                body { font-family: 'Inter', sans-serif; line-height: 1.6; color: #334155; padding: 1em; }
+                ${generatePreviewStyleString(convertedStyles)}
+            </style>`;
+
+            const titleHtml = articleTitleInput.value ? `<h1>${articleTitleInput.value}</h1>` : '';
+            const contentHtml = articleContentEditor.value; // 获取 textarea 的原始 HTML 内容
+
+            previewDoc.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    ${styleHtml}
+                </head>
+                <body>
+                    ${titleHtml}
+                    ${contentHtml}
+                </body>
+                </html>
+            `);
+            previewDoc.close();
+        };
+
+        // 绑定 textarea 的 input 事件来实时更新预览
+        articleContentEditor.addEventListener('input', updatePreview);
+        articleTitleInput.addEventListener('input', updatePreview); // 标题改变也更新预览
+
+        // --- 快捷键逻辑 ---
+        document.addEventListener('keydown', (event) => {
+            // 确保 Alt 键被按下
+            if (event.altKey) {
+                let handled = true;
+                switch (event.key.toLowerCase()) {
+                    case 'p':
+                        insertPButton.click();
+                        break;
+                    case '1':
+                        insertH1Button.click();
+                        break;
+                    case '2':
+                        insertH2Button.click();
+                        break;
+                    case 'i': // Alt + I for Image Placeholder
+                        insertImgPlaceholderButton.click();
+                        break;
+                    case '5':
+                        insertH5Button.click();
+                        break;
+                    case 'm':
+                        insertMarkButton.click();
+                        break;
+                    case 'h':
+                        insertHrButton.click();
+                        break;
+                    case 'b':
+                        insertBlockquoteButton.click();
+                        break;
+                    case 's':
+                        insertScoreButton.click();
+                        break;
+                    case 'd':
+                        insertStepsButton.click();
+                        break;
+                    default:
+                        handled = false;
+                        break;
+                }
+                if (handled) {
+                    event.preventDefault(); // 阻止浏览器默认行为
+                }
+            }
+        });
+
+
+        // 初始化编辑器和预览
+        renderStepsList();
+        updateScorePreview();
+        updatePreview(); // 页面加载时首次渲染预览
+    </script>
+</body>
+</html>
